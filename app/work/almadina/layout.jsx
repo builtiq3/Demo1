@@ -10,7 +10,7 @@ export default function Layout({ children }) {
     "@type": "GroceryStore",
     "name": "Al Madina Hypermarket",
     "address": { "@type": "PostalAddress", "addressLocality": "Deira", "addressRegion": "Dubai", "addressCountry": "AE" },
-    "telephone": "+971500000000",
+    "telephone": "+971562512042",
     "priceRange": "AED 1-100"
   }
   return (
