@@ -1,5 +1,6 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
+import Link from "next/link"
 import { createClient } from "@supabase/supabase-js"
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
@@ -32,12 +33,19 @@ export default function Admin(){
     setUploading(false)
   }
 
-  const saveProduct = async()=>{
+    const saveProduct = async()=>{
     if(!form.name ||!form.price) return alert("Name + Price required")
+    const payload = {
+      name: form.name, 
+      price: Number(form.price), 
+      category: form.category, 
+      image_url: form.image_url, 
+      in_stock: form.stock
+    }
     if(editId){
-      await supabase.from("products").update({name:form.name, price:form.price, category:form.category, image_url:form.image_url, in_stock:form.stock}).eq("id", editId)
+      await supabase.from("products").update(payload).eq("id", editId)
     } else {
-      await supabase.from("products").insert({name:form.name, price:form.price, category:form.category, image_url:form.image_url, in_stock:form.stock})
+      await supabase.from("products").insert(payload)
     }
     setForm({name:'', price:'', category:'Rice', image_url:'', stock:true}); setEditId(null); load()
   }
@@ -46,14 +54,19 @@ export default function Admin(){
 
   const del = async(id)=>{ if(confirm("Delete?")){ await supabase.from("products").delete().eq("id", id); load()} }
 
-  const toggleOffer = async(p)=>{
+    const toggleOffer = async(p)=>{
     const newOffer =!p.is_on_offer
-    const offerPrice = newOffer? prompt(`Offer price for ${p.name} (Original AED ${p.price})`, Math.round(p.price*0.8)) : null
-    if(newOffer &&!offerPrice) return
-    await supabase.from("products").update({is_on_offer:newOffer, offer_price: offerPrice? Number(offerPrice):null, discount_percent: newOffer? Math.round((1-offerPrice/p.price)*100):null}).eq("id", p.id)
+    if(newOffer){
+      const offerPrice = prompt(`Offer price for ${p.name} (Original AED ${p.price})`, Math.round(p.price*0.8))
+      if(!offerPrice) return
+      const op = Number(offerPrice)
+      const disc = Math.round((1-op/Number(p.price))*100)
+      await supabase.from("products").update({is_on_offer:true, offer_price: op, discount_percent: disc}).eq("id", p.id)
+    } else {
+      await supabase.from("products").update({is_on_offer:false, offer_price: null, discount_percent: null}).eq("id", p.id)
+    }
     load()
   }
-
   const generateBrochure = ()=>{
     const offerProducts = products.filter(p=>p.is_on_offer)
     if(offerProducts.length===0) return alert("No offer products selected")
@@ -140,8 +153,8 @@ export default function Admin(){
             ))}
           </div>
 
-          <div className="mt-6 p-4 bg-zinc-100 rounded text-sm">
-            <b>How Brochure Works:</b> Select products per category using "Add to Offers" > Click Auto Generate Brochure > Save as PDF > Send to WhatsApp customers. Offer page auto-updates.
+            <div className="mt-6 p-4 bg-zinc-100 rounded text-sm">
+            <b>How Brochure Works:</b> Select products per category using &quot;Add to Offers&quot; then click Auto Generate Brochure then Save as PDF then Send to WhatsApp customers. Offer page auto-updates.
             <br/>Frontend: <a href="/work/almadina/offers" className="underline text-blue-600">/work/almadina/offers</a>
           </div>
         </div>

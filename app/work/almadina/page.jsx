@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState, useMemo } from "react"
+import Link from "next/link"
 
 export default function AlMadinaShop(){
   const [products,setProducts]=useState([])
@@ -11,10 +12,26 @@ export default function AlMadinaShop(){
   const [custPhone,setCustPhone]=useState("")
   const [loaded,setLoaded]=useState(false)
 
-  useEffect(()=>{
-    fetch("/api/products?store=almadina").then(r=>r.json()).then(d=>{
+   useEffect(()=>{
+    async function load(){
+      const res = await fetch(`/api/products?store=almadina&t=${Date.now()}`, { cache: 'no-store' })
+      const d = await res.json()
       setProducts(Array.isArray(d)? d : [])
-    })
+    }
+    load()
+
+    ;(async()=>{
+      const { createClient } = await import("@supabase/supabase-js")
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      )
+      supabase.channel('products-realtime')
+       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+          load()
+        })
+       .subscribe()
+    })()
   },[])
 
   useEffect(()=>{
@@ -48,7 +65,7 @@ export default function AlMadinaShop(){
     setCart(c=>{
       const f=c.find(x=>x.id===p.id)
       if(f) return c.map(x=>x.id===p.id?{...x,qty:x.qty+1}:x)
-      return [...c,{...p,qty:1}]
+      return [...c,{...p,qty:1, price: p.is_on_offer? (p.offer_price || p.price) : p.price}]
     })
     setDrawer(true)
   }
@@ -74,13 +91,12 @@ export default function AlMadinaShop(){
       body:JSON.stringify({ store:"almadina", items:cart, total, customer_name:custName, customer_phone:custPhone })
     })
     const msg = `Salam Al Madina!%0A%0ACustomer: ${custName}%0APhone: ${custPhone}%0A%0AOrder:%0A${itemsText}%0A%0ATotal: AED ${total}`
-    window.open(`https://wa.me/971500000000?text=${msg}`,"_blank")
+    window.open(`https://wa.me/971562512042?text=${msg}`,"_blank")
     setCart([])
   }
 
   return (
     <div className="min-h-screen bg-[#FFFBF5] text-zinc-900">
-      {/* HEADER - MOBILE FIXED (NOT CONGESTED) */}
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b px-4 py-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -90,38 +106,49 @@ export default function AlMadinaShop(){
               <div className="text-[11px] text-zinc-400">Deira, Dubai</div>
             </div>
           </div>
-          <button onClick={()=>setDrawer(true)} className="relative bg-black text-white px-4 py-2.5 rounded-full text-sm font-bold flex items-center gap-2">
-            <span>🛒</span>
-            <span>{count}</span>
-            <span className="hidden md:inline">- AED {total}</span>
-            {count>0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] grid place-items-center rounded-full">{count}</span>}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href="/work/almadina/offers" className="bg-yellow-400 text-black font-bold px-3 py-2.5 rounded-full text-[12px] hover:bg-yellow-300">
+              🔥 Offers
+            </Link>
+            <button onClick={()=>setDrawer(true)} className="relative bg-black text-white px-4 py-2.5 rounded-full text-sm font-bold flex items-center gap-2">
+              <span>🛒</span>
+              <span>{count}</span>
+              {count>0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] grid place-items-center rounded-full">{count}</span>}
+            </button>
+          </div>
         </div>
         <div className="mt-3 md:hidden">
-          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search rice, milk, dates..." className="w-full bg-zinc-100 px-4 py-2.5 rounded-full text-sm outline-none focus:ring-2 focus:ring-black/10"/>
-        </div>
-        <div className="hidden md:block absolute left-1/2 -translate-x-1/2 top-3.5">
-          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search..." className="bg-zinc-100 px-4 py-2 rounded-full text-sm w-64 outline-none"/>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search rice, milk, dates..." className="w-full bg-zinc-100 px-4 py-2.5 rounded-full text-sm outline-none"/>
         </div>
       </header>
 
-      <div className="bg-[#0a5c36] text-white text-center py-2 text-[11px] tracking-wide">✓ Free Delivery in Deira for AED 100+ ✓ Cash on Delivery ✓ 9AM-11PM</div>
+      <div className="bg-[#0a5c36] text-white text-center py-2 text-[11px] tracking-wide flex justify-center gap-4">
+        <span>✓ Free Delivery AED 100+</span>
+        <Link href="/work/almadina/offers" className="underline font-bold">🔥 Weekly Offers - Click Here</Link>
+      </div>
 
-      <div className="px-4 py-3 flex gap-2 overflow-auto scrollbar-hide">
+      <div className="px-4 py-3 flex gap-2 overflow-auto">
         {cats.map(c=>(
-          <button key={c} onClick={()=>setCat(c)} className={`px-4 py-2 rounded-full text-sm border whitespace-nowrap transition ${cat===c?"bg-[#0a5c36] text-white border-[#0a5c36]":"bg-white hover:bg-zinc-50"}`}>{c}</button>
+          <button key={c} onClick={()=>setCat(c)} className={`px-4 py-2 rounded-full text-sm border whitespace-nowrap ${cat===c?"bg-[#0a5c36] text-white border-[#0a5c36]":"bg-white"}`}>{c}</button>
         ))}
       </div>
 
       <div className="px-4 pb-24 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-7xl mx-auto">
         {filtered.map(p=>(
-          <div key={p.id} className="bg-white rounded-[20px] p-3 shadow-sm border hover:shadow-md transition">
+          <div key={p.id} className={`bg-white rounded-[20px] p-3 shadow-sm border hover:shadow-md transition relative ${p.is_on_offer?'border-yellow-400 border-2':''}`}>
+            {p.is_on_offer && <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full z-10">{p.discount_percent}% OFF</span>}
             <img src={p.image_url} loading="lazy" alt={p.name} className="h-32 w-full object-cover rounded-[14px] bg-zinc-100"/>
-            <div className="mt-3 text-[11px] text-zinc-500 uppercase tracking-wide">{p.category}</div>
+            <div className="mt-3 text-[11px] text-zinc-500 uppercase">{p.category}</div>
             <div className="font-semibold leading-tight mt-1 text-[14px] line-clamp-2">{p.name}</div>
             <div className="flex justify-between items-center mt-3">
-              <span className="font-black text-[14px]">AED {p.price}</span>
-              <button onClick={()=>add(p)} className="bg-[#0a5c36] text-white w-8 h-8 rounded-full hover:bg-black transition">+</button>
+              <div>
+                {p.is_on_offer? (
+                  <><span className="line-through text-zinc-400 text-xs">AED {p.price}</span><br/><span className="font-black text-[14px] text-green-600">AED {p.offer_price}</span></>
+                ) : (
+                  <span className="font-black text-[14px]">AED {p.price}</span>
+                )}
+              </div>
+              <button onClick={()=>add(p)} className="bg-[#0a5c36] text-white w-8 h-8 rounded-full">+</button>
             </div>
           </div>
         ))}
@@ -131,34 +158,33 @@ export default function AlMadinaShop(){
 
       {drawer && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div onClick={()=>setDrawer(false)} className="flex-1 bg-black/30 backdrop-blur-sm"></div>
-          <div className="w-full max-w-[380px] bg-white p-6 flex flex-col h-full shadow-2xl">
+          <div onClick={()=>setDrawer(false)} className="flex-1 bg-black/30"></div>
+          <div className="w-full max-w-[380px] bg-white p-6 flex flex-col h-full">
             <div className="flex justify-between items-center">
               <b className="text-lg">Your Cart ({count})</b>
               <button onClick={()=>setDrawer(false)} className="w-8 h-8 bg-zinc-100 rounded-full">✕</button>
             </div>
-            <div className="mt-6 space-y-3 flex-1 overflow-auto pr-1">
+            <div className="mt-6 space-y-3 flex-1 overflow-auto">
               {cart.map(i=>(
                 <div key={i.id} className="flex justify-between items-center bg-zinc-50 p-3 rounded-2xl border">
                   <div className="flex-1 pr-3">
-                    <div className="text-sm font-semibold leading-tight">{i.name}</div>
-                    <div className="text-xs text-zinc-500 mt-1">AED {i.price} × {i.qty} = <b className="text-black">AED {i.price*i.qty}</b></div>
+                    <div className="text-sm font-semibold">{i.name}</div>
+                    <div className="text-xs text-zinc-500">AED {i.price} × {i.qty} = <b className="text-black">AED {i.price*i.qty}</b></div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={()=>dec(i.id)} className="w-8 h-8 rounded-full border bg-white grid place-items-center font-bold">−</button>
+                    <button onClick={()=>dec(i.id)} className="w-8 h-8 rounded-full border bg-white">−</button>
                     <span className="w-6 text-center text-sm font-black">{i.qty}</span>
-                    <button onClick={()=>inc(i.id)} className="w-8 h-8 rounded-full bg-black text-white grid place-items-center font-bold">+</button>
+                    <button onClick={()=>inc(i.id)} className="w-8 h-8 rounded-full bg-black text-white">+</button>
                   </div>
                 </div>
               ))}
-              {cart.length===0 && <p className="text-zinc-400 text-center mt-20">Cart empty<br/>Add products</p>}
+              {cart.length===0 && <p className="text-zinc-400 text-center mt-20">Cart empty</p>}
             </div>
             <div className="border-t pt-4 space-y-2">
-              <input value={custName} onChange={e=>setCustName(e.target.value)} placeholder="Your Name" className="w-full border p-3 rounded-xl text-sm outline-none focus:border-black"/>
-              <input value={custPhone} onChange={e=>setCustPhone(e.target.value)} placeholder="WhatsApp: 050..." className="w-full border p-3 rounded-xl text-sm outline-none focus:border-black"/>
+              <input value={custName} onChange={e=>setCustName(e.target.value)} placeholder="Your Name" className="w-full border p-3 rounded-xl text-sm"/>
+              <input value={custPhone} onChange={e=>setCustPhone(e.target.value)} placeholder="WhatsApp: 050..." className="w-full border p-3 rounded-xl text-sm"/>
               <div className="flex justify-between font-black text-lg py-2"><span>Total</span><span>AED {total}</span></div>
-              <button onClick={orderWhatsApp} className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white py-4 rounded-full font-bold text-sm transition">Order on WhatsApp</button>
-              <div className="text-[10px] text-center text-zinc-400 pt-2">Secure • SSL Protected • BuildIQ</div>
+              <button onClick={orderWhatsApp} className="w-full bg-[#25D366] text-white py-4 rounded-full font-bold">Order on WhatsApp</button>
             </div>
           </div>
         </div>
